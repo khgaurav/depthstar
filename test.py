@@ -3,7 +3,7 @@ from torchvision import transforms
 from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
-from HybridDepthModel import HybridDepthModel
+from model import DepthSTAR, HybridDepthModel
 import argparse
 import os
 
@@ -18,7 +18,12 @@ def visualize_single_prediction(img_path: str, model_path: str, img_size: int):
 
     # --- Model Loading ---
     print(f"Loading model from: {model_path}")
-    model = HybridDepthModel(input_size=img_size).to(device)
+    model = DepthSTAR(
+         use_residual_blocks=True,
+         use_transformer=True,
+         transformer_layers=8,
+         transformer_heads=8,
+         embed_dim=512).to(device)
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
 
@@ -58,7 +63,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--image_path', type=str, default='../data/image.jpg')
     parser.add_argument('--model_path', type=str, default='../data/depth_model_32.pth')
-    parser.add_argument('--img_size', type=int, default=32)
+    parser.add_argument('--img_size', type=int, default=224)
     args = parser.parse_args()
 
     visualize_single_prediction(img_path=args.image_path, model_path=args.model_path, img_size=args.img_size)
