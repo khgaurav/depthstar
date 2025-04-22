@@ -14,7 +14,7 @@ from model import DepthSTAR
 
 def compute_depth_metrics(pred: torch.Tensor, gt: torch.Tensor, mask: torch.Tensor) -> Dict[str, float]:
     """
-    Computes depth metrics (RMSE, AbsRel, SqRel, LogRMSE, Accuracy thresholds)
+    Computes depth metrics (RMSE, MAE, AbsRel, SqRel, LogRMSE, Accuracy thresholds)
     
     Args:
         pred: predicted depth map
@@ -54,19 +54,22 @@ def compute_depth_metrics(pred: torch.Tensor, gt: torch.Tensor, mask: torch.Tens
 
     # RMSE computed on all valid pixels (gt > 0)
     if gt_m.numel() == 0:
-        rmse = torch.tensor(float("nan"), device=pred.device)
+        rmse = torch.tensor(float('nan'), device=pred.device)
+        mae = torch.tensor(float('nan'), device=pred.device)
     else:
         rmse = torch.sqrt(((gt_m - pred_m) ** 2).mean())
+        mae = torch.abs(gt_m - pred_m).mean()
 
     return {
-        "rmse": rmse.item(),
-        "abs_rel": abs_rel.item(),
-        "sq_rel": sq_rel.item(),
-        "log_rmse": log_rmse.item(),
-        "delta1": delta1.item(),
-        "delta2": delta2.item(),
-        "delta3": delta3.item(),
-        "count": mask.sum().item(),  # Number of valid pixels used
+        'rmse': rmse.item(),
+        'mae': mae.item(),
+        'abs_rel': abs_rel.item(),
+        'sq_rel': sq_rel.item(),
+        'log_rmse': log_rmse.item(),
+        'delta1': delta1.item(),
+        'delta2': delta2.item(),
+        'delta3': delta3.item(),
+        'count': mask.sum().item() # Number of valid pixels used
     }
 
 
@@ -74,7 +77,7 @@ def compute_depth_metrics(pred: torch.Tensor, gt: torch.Tensor, mask: torch.Tens
 
 
 def evaluate_model_on_datasets(
-    model_path: str, dataset_configs: List[Dict[str, Any]], img_size: int, batch_size: int = 8
+    model_path: str, dataset_configs: List[Dict[str, Any]], batch_size: int = 8
 ) -> Dict[str, Dict[str, float]]:
     """
     Evaluates depth estimation model on datasets and returns metrics.
@@ -82,7 +85,6 @@ def evaluate_model_on_datasets(
     Args:
         model_path: path to model
         dataset_configs: list of dataset configs
-        img_size: size to resize images to
         batch_size: batch size
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -100,12 +102,10 @@ def evaluate_model_on_datasets(
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
 
-    transform = transforms.Compose(
-        [
-            # transforms.Resize((img_size, img_size)),
-            transforms.ToTensor()
-        ]
-    )
+    transform = transforms.Compose([
+        transforms.Resize((32, 32)),
+        transforms.ToTensor()
+    ])
 
     results = {}
 
@@ -142,18 +142,7 @@ def evaluate_model_on_datasets(
             pin_memory=True,
         )
 
-        total_metrics = {
-            k: 0.0
-            for k in [
-                "rmse",
-                "abs_rel",
-                "sq_rel",
-                "log_rmse",
-                "delta1",
-                "delta2",
-                "delta3",
-            ]
-        }
+        total_metrics = {k: 0.0 for k in ['rmse', 'mae', 'abs_rel', 'sq_rel', 'log_rmse', 'delta1', 'delta2', 'delta3']}
         total_count = 0
         start_time = time.time()
 
@@ -230,6 +219,7 @@ def evaluate_model_on_datasets(
         print(f"Evaluation Time: {eval_time:.2f} seconds")
         if total_count > 0:
             print(f"  RMSE:      {avg_metrics['rmse']:.4f}")
+            print(f"  MAE:      {avg_metrics['mae']:.4f}")
             print(f"  AbsRel:    {avg_metrics['abs_rel']:.4f}")
             print(f"  SqRel:     {avg_metrics['sq_rel']:.4f}")
             print(f"  LogRMSE:   {avg_metrics['log_rmse']:.4f}")
@@ -250,11 +240,13 @@ def evaluate_model_on_datasets(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Benchmark Depth Estimation Model")
 
-    parser.add_argument('--batch_size', type=int, default=2)
+    parser.add_argument('--batch_size', type=int, default=32)
 
     # Example using placeholder paths:
     parser.add_argument('--nyu_v2_path', type=str, default='./data/nyu_depth_v2_labeled.mat')
     parser.add_argument('--custom_rgbd_path', type=str, default='./Distill-Any-Depth/')
+    parser.add_argument('--model_path', type=str, default='./data/best_depth_model.pth')
+
 
     args = parser.parse_args()
 
@@ -271,10 +263,9 @@ if __name__ == "__main__":
 
     # --- Run Evaluation ---
     all_results = evaluate_model_on_datasets(
-        model_path=f'./data/best_depth_model.pth',
+        model_path=args.model_path,
         dataset_configs=dataset_configurations,
-        img_size=args.img_size,
-        batch_size=args.batch_size,
+        batch_size=args.batch_size
     )
 
     print("\n--- Benchmark Summary ---")

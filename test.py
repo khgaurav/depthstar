@@ -3,7 +3,6 @@ import os
 import random
 import time
 
-<<<<<<< HEAD
 import matplotlib.pyplot as plt
 import torch
 from PIL import Image
@@ -13,29 +12,21 @@ from dataset import RGBDepthDataset
 from model import DepthSTAR
 
 
-def visualize_single_prediction(img_path: str, model_path: str, img_size: int) -> None:
+def visualize_single_prediction(img_path: str, model_path: str) -> None:
     """
     Visualizes and saves a depth map prediction.
     
     Args:
         img_path: path to RGB image
         model_path: path to model
-        img_size: image size in pixels
     """
-
-=======
-
-def visualize_single_prediction(img_path: str, model_path: str):
->>>>>>> 1993bc795e89abc36266382b041b6c81c7300042
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
     # --- Input Image Transform ---
-    transform = transforms.Compose(
-        [
-            transforms.ToTensor()
-        ]
-    )
+    transform = transforms.Compose([
+        transforms.Resize((32, 32)),
+        transforms.ToTensor()])
 
     # --- Model Loading ---
     print(f"Loading model from: {model_path}")
@@ -53,17 +44,12 @@ def visualize_single_prediction(img_path: str, model_path: str):
     print(f"Total trainable parameters: {total_params:,}")
 
     print(f"Loading image from: {img_path}")
-<<<<<<< HEAD
-    img_pil = Image.open(img_path).convert("RGB")
-    rgb_tensor = transform(img_pil).unsqueeze(0).to(device)  # Add batch dimension
 
-=======
     img_pil = Image.open(img_path).convert('RGB')
     rgb_tensor = transform(img_pil).unsqueeze(0).to(device)
     start_time = time.time()
     if device == torch.device("cuda"):
         torch.cuda.synchronize()
->>>>>>> 1993bc795e89abc36266382b041b6c81c7300042
     with torch.no_grad():
         pred_depth_tensor = model(rgb_tensor)
     if device == torch.device("cuda"):
@@ -87,13 +73,8 @@ def visualize_single_prediction(img_path: str, model_path: str):
 
     base_path, img_filename = os.path.split(img_path)
     filename_no_ext, _ = os.path.splitext(img_filename)
-<<<<<<< HEAD
-
-    output_filename = f"{filename_no_ext}_out_{img_size}.png"
-=======
     
     output_filename = f"{filename_no_ext}_out.png"
->>>>>>> 1993bc795e89abc36266382b041b6c81c7300042
     output_path = os.path.join(base_path, output_filename)
 
     fig.savefig(output_path, bbox_inches="tight", dpi=150)
@@ -102,40 +83,23 @@ def visualize_single_prediction(img_path: str, model_path: str):
 
     plt.close(fig)
 
-<<<<<<< HEAD
 
-def visualize_dataset_prediction(model_path: str, img_size: int):
+def visualize_dataset_prediction(model_path: str):
     """
     Visualizes and saves a depth map prediction for a dataset.
     
     Args:
         model_path: path to model
-        img_size: image size in pixels
     """
-=======
-def visualize_dataset_prediction(model_path: str):
->>>>>>> 1993bc795e89abc36266382b041b6c81c7300042
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
     # --- Input Image Transform ---
-    transform = transforms.Compose(
-        [
-            # transforms.Resize((img_size, img_size)),
-            transforms.ToTensor()
-        ]
-    )
+    transform = transforms.Compose([
+        # transforms.Resize((img_size, img_size)),
+        transforms.ToTensor()])
 
-<<<<<<< HEAD
-    dataset = RGBDepthDataset(
-        "../Distill-Any-Depth/cifar_depths",
-        "../Distill-Any-Depth/cifar_depths",
-        transform,
-        transform,
-    )
-=======
-    dataset = RGBDepthDataset('./Distill-Any-Depth/cifar_depths', './Distill-Any-Depth/cifar_depths', transform, transform)
->>>>>>> 1993bc795e89abc36266382b041b6c81c7300042
+    dataset = RGBDepthDataset('./Distill-Any-Depth/cifar_images', './Distill-Any-Depth/cifar_depths', transform, transform)
 
     # --- Model Loading ---
     print(f"Loading model from: {model_path}")
@@ -171,7 +135,7 @@ def visualize_dataset_prediction(model_path: str):
                 ax.axis("off")
 
     output_filename = "out.png"
-    output_path = os.path.join("../data", output_filename)
+    output_path = os.path.join("./data", output_filename)
 
     fig.savefig(output_path, bbox_inches="tight", dpi=150)
     print(f"Saved comparison image with scale to: {output_path}")
@@ -180,27 +144,12 @@ def visualize_dataset_prediction(model_path: str):
     plt.close(fig)
 
 
-<<<<<<< HEAD
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Visualize")
 
-    parser.add_argument(
-        "--image_path",
-        type=str,
-        default="/home/kothamachuharish.g/Distill-Any-Depth/cifar_images/img_0000.png",
-    )
-    parser.add_argument(
-        "--model_path", type=str, default="../data/depth_model_cifar_32.pth"
-    )
-    parser.add_argument("--img_size", type=int, default=32)
-    args = parser.parse_args()
-
-    visualize_dataset_prediction(model_path=args.model_path, img_size=args.img_size)
-=======
     parser.add_argument('--image_path', type=str, default='img.png')
-    parser.add_argument('--model_path', type=str, default='./data/depth_model_nyu_32.pth')
+    parser.add_argument('--model_path', type=str, default='./data/best_depth_model.pth')
     args = parser.parse_args()
 
-    visualize_single_prediction(img_path=args.image_path, model_path=args.model_path)
-    # visualize_dataset_prediction(model_path=args.model_path)
->>>>>>> 1993bc795e89abc36266382b041b6c81c7300042
+    # visualize_single_prediction(img_path=args.image_path, model_path=args.model_path)
+    visualize_dataset_prediction(model_path=args.model_path)

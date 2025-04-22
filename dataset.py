@@ -110,8 +110,8 @@ class NYUDepthV2MatDataset(Dataset):
         with h5py.File(self.mat_file_path, "r") as f:
             self.images = np.array(f[self.img_key]).transpose(0, 3, 2, 1)
             self.depths = np.array(f[self.depth_key]).transpose(0, 2, 1)
-        self.images = self.images[201:]
-        self.depths = self.depths[201:]
+        self.images = self.images
+        self.depths = self.depths
         print(f"Loaded {len(self.images)} samples.")
 
         valid_depths = self.depths[self.depths > 1e-6]

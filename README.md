@@ -43,7 +43,7 @@ Open the generate_dataset.ipynb notebook and execute all the cells to download C
 Execute the training script:
 
 ```bash
-python train.py --epochs 200 --batch_size 16 --lr 1e-4 --data_dir ./data --model_save_path ./models
+python train.py --epochs 200 --batch_size 16 --lr 1e-5 --data_dir ./Distill-Any-Depth --model_save_path ./data
 ```
 
 This script will save the best-performing model based on validation accuracy into the specified `model_save_path`.
@@ -53,7 +53,7 @@ This script will save the best-performing model based on validation accuracy int
 Use the benchmarking script to evaluate on datasets:
 
 ```bash
-python benchmark.py --img_size 32 --batch_size 8 --nyu_v2_path ./data/nyu_depth_v2_labeled.mat
+python benchmark.py --batch_size 8 --nyu_v2_path ./data/nyu_depth_v2_labeled.mat
 ```
 
 Evaluation results will display RMSE, MAE, and other metrics clearly in the terminal.
@@ -63,7 +63,7 @@ Evaluation results will display RMSE, MAE, and other metrics clearly in the term
 To visualize depth predictions for individual images:
 
 ```bash
-python test.py --image_path ./data/ing.png --model_path ./models/best_depth_model.pth --img_size 32
+python test.py --image_path ./data/image.jpg --model_path ./data/best_depth_model.pth
 ```
 
 Visualizations will appear and save to the directory containing the input image.
