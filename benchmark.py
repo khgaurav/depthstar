@@ -72,7 +72,6 @@ def compute_depth_metrics(pred: torch.Tensor, gt: torch.Tensor, mask: torch.Tens
 
 # --- Main Evaluation Function ---
 
-<<<<<<< HEAD
 
 def evaluate_model_on_datasets(
     model_path: str, dataset_configs: List[Dict[str, Any]], img_size: int, batch_size: int = 8
@@ -86,9 +85,6 @@ def evaluate_model_on_datasets(
         img_size: size to resize images to
         batch_size: batch size
     """
-=======
-def evaluate_model_on_datasets(model_path: str, dataset_configs: list, batch_size: int = 8):
->>>>>>> 1993bc795e89abc36266382b041b6c81c7300042
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
@@ -254,28 +250,11 @@ def evaluate_model_on_datasets(model_path: str, dataset_configs: list, batch_siz
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Benchmark Depth Estimation Model")
 
-<<<<<<< HEAD
-    parser.add_argument("--img_size", type=int, default=32)
-    parser.add_argument("--batch_size", type=int, default=2)
-
-    # Example using placeholder paths:
-    parser.add_argument(
-        "--nyu_v2_path",
-        type=str,
-        default="/home/kothamachuharish.g/data/nyu_depth_v2_labeled.mat",
-    )
-    parser.add_argument(
-        "--custom_rgbd_path",
-        type=str,
-        default="/home/kothamachuharish.g/Distill-Any-Depth/",
-    )
-=======
     parser.add_argument('--batch_size', type=int, default=2)
 
     # Example using placeholder paths:
     parser.add_argument('--nyu_v2_path', type=str, default='./data/nyu_depth_v2_labeled.mat')
     parser.add_argument('--custom_rgbd_path', type=str, default='./Distill-Any-Depth/')
->>>>>>> 1993bc795e89abc36266382b041b6c81c7300042
 
     args = parser.parse_args()
 
@@ -292,11 +271,7 @@ if __name__ == "__main__":
 
     # --- Run Evaluation ---
     all_results = evaluate_model_on_datasets(
-<<<<<<< HEAD
-        model_path=f"/home/kothamachuharish.g/data/depth_model_cifar_{args.img_size}.pth",
-=======
         model_path=f'./data/best_depth_model.pth',
->>>>>>> 1993bc795e89abc36266382b041b6c81c7300042
         dataset_configs=dataset_configurations,
         img_size=args.img_size,
         batch_size=args.batch_size,
