@@ -3,9 +3,11 @@ from torchvision import transforms
 from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
-from model import DepthSTAR, HybridDepthModel
+from model import DepthSTAR
+from dataset import RGBDepthDataset
 import argparse
 import os
+import random
 
 def visualize_single_prediction(img_path: str, model_path: str, img_size: int):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -13,7 +15,7 @@ def visualize_single_prediction(img_path: str, model_path: str, img_size: int):
 
     # --- Input Image Transform ---
     transform = transforms.Compose([
-        transforms.Resize((img_size, img_size)),
+        # transforms.Resize((img_size, img_size)),
         transforms.ToTensor()])
 
     # --- Model Loading ---
@@ -58,12 +60,66 @@ def visualize_single_prediction(img_path: str, model_path: str, img_size: int):
 
     plt.close(fig)
 
+def visualize_dataset_prediction(model_path: str, img_size: int):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+
+    # --- Input Image Transform ---
+    transform = transforms.Compose([
+        # transforms.Resize((img_size, img_size)),
+        transforms.ToTensor()])
+
+    dataset = RGBDepthDataset('../Distill-Any-Depth/cifar_depths', '../Distill-Any-Depth/cifar_depths', transform, transform)
+
+    # --- Model Loading ---
+    print(f"Loading model from: {model_path}")
+    model = DepthSTAR(
+         use_residual_blocks=True,
+         use_transformer=True,
+         transformer_layers=8,
+         transformer_heads=8,
+         embed_dim=512).to(device)
+    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.eval()
+
+
+    indices = random.sample(range(len(dataset)), 5)
+    fig, axs = plt.subplots(5, 3, figsize=(9, 10))
+    axs = axs.reshape(5, 3)
+
+    with torch.no_grad():
+        for i, idx in enumerate(indices):
+            rgb, gt_depth = dataset[idx]
+            rgb_input = rgb.unsqueeze(0).cuda()
+            pred_depth = model(rgb_input).squeeze().cpu().numpy()
+            gt_depth = gt_depth.squeeze().numpy()
+
+            axs[i][0].imshow(rgb.permute(1, 2, 0))
+            axs[i][0].set_title("RGB")
+            axs[i][1].imshow(gt_depth, cmap='inferno')
+            axs[i][1].set_title("Ground Truth")
+            axs[i][2].imshow(pred_depth, cmap='inferno')
+            axs[i][2].set_title("Predicted")
+
+            for ax in axs[i]:
+                ax.axis('off')
+    
+    
+    output_filename = "out.png"
+    output_path = os.path.join("../data", output_filename)
+
+    fig.savefig(output_path, bbox_inches='tight', dpi=150)
+    print(f"Saved comparison image with scale to: {output_path}")
+    plt.show()
+
+    plt.close(fig)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Visualize')
 
-    parser.add_argument('--image_path', type=str, default='../data/image.jpg')
-    parser.add_argument('--model_path', type=str, default='../data/depth_model_32.pth')
-    parser.add_argument('--img_size', type=int, default=224)
+    parser.add_argument('--image_path', type=str, default='/home/kothamachuharish.g/Distill-Any-Depth/cifar_images/img_0000.png')
+    parser.add_argument('--model_path', type=str, default='../data/depth_model_cifar_32.pth')
+    parser.add_argument('--img_size', type=int, default=32)
     args = parser.parse_args()
 
-    visualize_single_prediction(img_path=args.image_path, model_path=args.model_path, img_size=args.img_size)
+    visualize_dataset_prediction(model_path=args.model_path, img_size=args.img_size)

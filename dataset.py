@@ -8,10 +8,11 @@ from PIL import Image
 import numpy as np
 
 class RGBDepthDataset(Dataset):
-    def __init__(self, rgb_dir, depth_dir, transform=None):
+    def __init__(self, rgb_dir, depth_dir, transform_rgb=None, transform_depth=None):
         self.rgb_paths = sorted(glob(os.path.join(rgb_dir, '*.png')))
         self.depth_paths = sorted(glob(os.path.join(depth_dir, '*.png')))
-        self.transform = transform
+        self.transform_rgb = transform_rgb
+        self.transform_depth = transform_depth
 
     def __len__(self):
         return len(self.rgb_paths)
@@ -20,50 +21,82 @@ class RGBDepthDataset(Dataset):
         rgb = Image.open(self.rgb_paths[idx]).convert('RGB')
         depth = Image.open(self.depth_paths[idx]).convert('L')
 
-        if self.transform:
-            rgb = self.transform(rgb)
-            depth = self.transform(depth)
+        if self.transform_rgb:
+            rgb = self.transform_rgb(rgb)
+        if self.transform_depth:
+            depth = self.transform_depth(depth)
 
         return rgb, depth
 
 
 class NYUDepthV2MatDataset(Dataset):
-    def __init__(self, mat_file_path, transform=None, max_depth_eval=10.0, img_key='images', depth_key='depths'):
+    def __init__(self, mat_file_path, transform_rgb=None, transform_depth=None, max_depth_percentile=99.9, img_key='images', depth_key='depths'):
+
         self.mat_file_path = mat_file_path
-        self.transform = transform
-        self.max_depth_eval = max_depth_eval
+        self.transform_rgb = transform_rgb
+        self.transform_depth = transform_depth
         self.img_key = img_key
         self.depth_key = depth_key
 
         print(f"Loading NYU Depth V2 data from: {mat_file_path}")
 
         with h5py.File(self.mat_file_path, 'r') as f:
-            self.images = np.array(f[self.img_key]).transpose(3, 2, 0, 1) # N C H W (assuming original C=3 is axis 2)
-            self.depths = np.array(f[self.depth_key]).transpose(2, 0, 1) # N H W
+            self.images = np.array(f[self.img_key]).transpose(0, 3, 2, 1)
+            self.depths = np.array(f[self.depth_key]).transpose(0, 2, 1)
+        self.images = self.images[201:]
+        self.depths = self.depths[201:]
         print(f"Loaded {len(self.images)} samples.")
-        with h5py.File(self.mat_file_path, 'r') as f:
-                self.images_raw = np.array(f[self.img_key]).transpose(3, 1, 0, 2) # N H W C
-                self.depths_raw = np.array(f[self.depth_key]).transpose(2, 1, 0) # N H W
-        print(f"Loaded {len(self.images_raw)} samples.")
+
+        valid_depths = self.depths[self.depths > 1e-6]
+        if valid_depths.size > 0:
+            # Calculate percentile and store as a standard float
+            self.max_depth = float(np.percentile(valid_depths, max_depth_percentile))
+        else:
+            self.max_depth = 10.0
 
     def __len__(self):
-        return len(self.images_raw)
+        return len(self.images)
 
     def __getitem__(self, idx):
-        rgb_raw_hwc = self.images_raw[idx] # Shape (H, W, C)
-        depth_raw_hw = self.depths_raw[idx] # Shape (H, W)
+        # Get raw data for the index
+        rgb_raw = self.images[idx]
+        depth_raw = self.depths[idx]
 
-        rgb_pil = Image.fromarray(rgb_raw_hwc, mode='RGB')
-        depth_pil = Image.fromarray(depth_raw_hw.astype(np.float32), mode='F')
+        # Convert to PIL Images
+        rgb_pil = Image.fromarray(rgb_raw, mode='RGB')
+        depth_pil = Image.fromarray(depth_raw.astype(np.float32), mode='F')
 
-        if self.transform:
-            rgb_tensor = self.transform(rgb_pil)
-            depth_tensor_transformed = self.transform(depth_pil)
-        depth_tensor_original_scale = depth_tensor_transformed.float() # Ensure float32
+        if self.transform_rgb:
+            rgb_tensor = self.transform_rgb(rgb_pil)
+        if self.transform_depth:
+            depth_tensor = self.transform_rgb(depth_pil)
 
-        valid_mask = (depth_tensor_original_scale > 1e-6) & (depth_tensor_original_scale <= self.max_depth_eval) # Shape [1, H, W]
 
-        return rgb_tensor, depth_tensor_original_scale, valid_mask
+        # Ensure tensor and squeeze channel dim for processing
+        if not isinstance(depth_tensor, torch.Tensor): raise TypeError("Depth is not a Tensor after transform.")
+        if depth_tensor.dim() == 3 and depth_tensor.shape[0] == 1: depth_tensor = depth_tensor.squeeze(0) # Shape [H, W]
+        elif depth_tensor.dim() != 2: raise ValueError(f"Unexpected depth tensor shape: {depth_tensor.shape}")
+
+
+        # --- Use self.max_depth calculated in __init__ ---
+        # 1. Calculate valid mask based on original values
+        valid_mask = (depth_tensor > 1e-6) & (depth_tensor <= self.max_depth) # Shape [H, W]
+
+        # 2. Clamp depth tensor
+        depth_clamped = torch.clamp(depth_tensor, min=0.0, max=self.max_depth) # Use pre-calculated float self.max_depth
+
+        # 3. Normalize clamped depth
+        depth_normalized = depth_clamped / self.max_depth # Range [0, 1]
+
+        # 4. Apply mask (set invalid regions to 0 in normalized depth)
+        depth_normalized[~valid_mask] = 0.0
+
+        # 5. Add channel dimension back for consistency [1, H, W]
+        depth_normalized = depth_normalized.unsqueeze(0)
+        valid_mask = valid_mask.unsqueeze(0) # Also give mask channel dim [1, H, W]
+
+        # 6. Return all three: rgb, normalized depth, and the mask
+        return rgb_tensor, depth_normalized
 
 def read_split_file(filepath):
     """Reads a Monodepth2 split file and returns a list of samples."""

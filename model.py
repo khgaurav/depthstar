@@ -88,39 +88,3 @@ class DepthSTAR(nn.Module):
             tokens = self.bottleneck(tokens)
             feat = tokens.transpose(1, 2).reshape(B, feat.shape[1], feat.shape[2], feat.shape[3])
         return self.decoder(feat)
-
-    def __init__(self):
-        super().__init__()
-        self.encoder = nn.Sequential(
-            nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),
-            nn.ReLU(),
-            ResidualBlock(128),
-            nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1),
-            nn.ReLU(),
-            ResidualBlock(256)
-        )
-
-        self.bottleneck = nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model=256, nhead=4, dim_feedforward=512, batch_first=True),
-            num_layers=4
-        )
-
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2, padding=1),
-            nn.ReLU(),
-            ResidualBlock(128),
-            nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(64, 1, kernel_size=3, padding=1),
-            nn.Sigmoid()
-        )
-
-    def forward(self, x):
-        feat = self.encoder(x)  # [B, 256, 8, 8]
-        B, C, H, W = feat.size()
-        tokens = feat.flatten(2).transpose(1, 2)  # [B, 64, 256]
-        tokens = self.bottleneck(tokens)
-        feat = tokens.transpose(1, 2).reshape(B, C, H, W)
-        return self.decoder(feat)
