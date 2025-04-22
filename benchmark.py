@@ -1,16 +1,29 @@
+import argparse
+import time
+from typing import Any, Dict, List
+
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torchvision import transforms
-import numpy as np
-import argparse
-import os
-import time
-from model import DepthSTAR
-from dataset import RGBDepthDataset, NYUDepthV2MatDataset
 
-def compute_depth_metrics(pred, gt, mask):
-    """Computes depth metrics (RMSE, AbsRel, SqRel, LogRMSE, Accuracy thresholds)"""
+from dataset import NYUDepthV2MatDataset, RGBDepthDataset
+from model import DepthSTAR
+
+
+def compute_depth_metrics(pred: torch.Tensor, gt: torch.Tensor, mask: torch.Tensor) -> Dict[str, float]:
+    """
+    Computes depth metrics (RMSE, AbsRel, SqRel, LogRMSE, Accuracy thresholds)
+    
+    Args:
+        pred: predicted depth map
+        gt: ground truth depth map
+        mask: mask showing points to use for evaluation
+
+    Returns:
+        dictionary with RMSE, AbsRel, SqRel, LogRMSE, delta 1-3, and valid pixel count
+    """
     pred_m = pred[mask]
     gt_m = gt[mask]
 
@@ -20,17 +33,17 @@ def compute_depth_metrics(pred, gt, mask):
     gt_m_rel = gt_m[valid_rel_mask]
 
     if gt_m_rel.numel() == 0:
-        abs_rel = torch.tensor(float('nan'), device=pred.device)
-        sq_rel = torch.tensor(float('nan'), device=pred.device)
-        log_rmse = torch.tensor(float('nan'), device=pred.device)
-        delta1 = torch.tensor(float('nan'), device=pred.device)
-        delta2 = torch.tensor(float('nan'), device=pred.device)
-        delta3 = torch.tensor(float('nan'), device=pred.device)
+        abs_rel = torch.tensor(float("nan"), device=pred.device)
+        sq_rel = torch.tensor(float("nan"), device=pred.device)
+        log_rmse = torch.tensor(float("nan"), device=pred.device)
+        delta1 = torch.tensor(float("nan"), device=pred.device)
+        delta2 = torch.tensor(float("nan"), device=pred.device)
+        delta3 = torch.tensor(float("nan"), device=pred.device)
     else:
         thresh = torch.maximum((gt_m_rel / pred_m_rel), (pred_m_rel / gt_m_rel))
         delta1 = (thresh < 1.25).float().mean()
-        delta2 = (thresh < 1.25 ** 2).float().mean()
-        delta3 = (thresh < 1.25 ** 3).float().mean()
+        delta2 = (thresh < 1.25**2).float().mean()
+        delta3 = (thresh < 1.25**3).float().mean()
 
         abs_diff = torch.abs(gt_m_rel - pred_m_rel)
         abs_rel = (abs_diff / gt_m_rel).mean()
@@ -41,25 +54,37 @@ def compute_depth_metrics(pred, gt, mask):
 
     # RMSE computed on all valid pixels (gt > 0)
     if gt_m.numel() == 0:
-        rmse = torch.tensor(float('nan'), device=pred.device)
+        rmse = torch.tensor(float("nan"), device=pred.device)
     else:
         rmse = torch.sqrt(((gt_m - pred_m) ** 2).mean())
 
-
     return {
-        'rmse': rmse.item(),
-        'abs_rel': abs_rel.item(),
-        'sq_rel': sq_rel.item(),
-        'log_rmse': log_rmse.item(),
-        'delta1': delta1.item(),
-        'delta2': delta2.item(),
-        'delta3': delta3.item(),
-        'count': mask.sum().item() # Number of valid pixels used
+        "rmse": rmse.item(),
+        "abs_rel": abs_rel.item(),
+        "sq_rel": sq_rel.item(),
+        "log_rmse": log_rmse.item(),
+        "delta1": delta1.item(),
+        "delta2": delta2.item(),
+        "delta3": delta3.item(),
+        "count": mask.sum().item(),  # Number of valid pixels used
     }
+
 
 # --- Main Evaluation Function ---
 
-def evaluate_model_on_datasets(model_path: str, dataset_configs: list, img_size: int, batch_size: int = 8):
+
+def evaluate_model_on_datasets(
+    model_path: str, dataset_configs: List[Dict[str, Any]], img_size: int, batch_size: int = 8
+) -> Dict[str, Dict[str, float]]:
+    """
+    Evaluates depth estimation model on datasets and returns metrics.
+    
+    Args:
+        model_path: path to model
+        dataset_configs: list of dataset configs
+        img_size: size to resize images to
+        batch_size: batch size
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
@@ -70,14 +95,17 @@ def evaluate_model_on_datasets(model_path: str, dataset_configs: list, img_size:
         use_transformer=True,
         transformer_layers=8,
         transformer_heads=8,
-        embed_dim=512).to(device)
+        embed_dim=512,
+    ).to(device)
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
 
-    transform = transforms.Compose([
-        # transforms.Resize((img_size, img_size)),
-        transforms.ToTensor()
-    ])
+    transform = transforms.Compose(
+        [
+            # transforms.Resize((img_size, img_size)),
+            transforms.ToTensor()
+        ]
+    )
 
     results = {}
 
@@ -95,7 +123,7 @@ def evaluate_model_on_datasets(model_path: str, dataset_configs: list, img_size:
                 transform_rgb=transform,
                 transform_depth=transform,
                 img_key=config.get("img_key", "images"),
-                depth_key=config.get("depth_key", "depths")
+                depth_key=config.get("depth_key", "depths"),
             )
 
         else:
@@ -106,33 +134,48 @@ def evaluate_model_on_datasets(model_path: str, dataset_configs: list, img_size:
             print(f"Dataset {dataset_name} is empty or failed to load.")
             continue
 
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=2, pin_memory=True)
+        dataloader = DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=2,
+            pin_memory=True,
+        )
 
-        total_metrics = {k: 0.0 for k in ['rmse', 'abs_rel', 'sq_rel', 'log_rmse', 'delta1', 'delta2', 'delta3']}
+        total_metrics = {
+            k: 0.0
+            for k in [
+                "rmse",
+                "abs_rel",
+                "sq_rel",
+                "log_rmse",
+                "delta1",
+                "delta2",
+                "delta3",
+            ]
+        }
         total_count = 0
         start_time = time.time()
 
         with torch.no_grad():
             for i, batch_data in enumerate(dataloader):
-
                 # --- Data Handling ---
                 if dataset_type == "nyu_v2_mat":
                     rgb_batch, target_depth_batch = batch_data
                     valid_mask_batch = target_depth_batch > 1e-8
 
-                else: # Should not happen due to earlier checks
+                else:  # Should not happen due to earlier checks
                     continue
 
                 rgb_batch = rgb_batch.to(device)
                 target_depth_batch = target_depth_batch.to(device)
                 valid_mask_batch = valid_mask_batch.to(device)
 
-                 # Remove channel dimension from mask and target if present (expected H, W)
+                # Remove channel dimension from mask and target if present (expected H, W)
                 if valid_mask_batch.dim() == 4 and valid_mask_batch.shape[1] == 1:
-                     valid_mask_batch = valid_mask_batch.squeeze(1)
+                    valid_mask_batch = valid_mask_batch.squeeze(1)
                 if target_depth_batch.dim() == 4 and target_depth_batch.shape[1] == 1:
-                     target_depth_batch = target_depth_batch.squeeze(1)
-
+                    target_depth_batch = target_depth_batch.squeeze(1)
 
                 # --- Inference ---
                 pred_depth_batch = model(rgb_batch)
@@ -143,21 +186,31 @@ def evaluate_model_on_datasets(model_path: str, dataset_configs: list, img_size:
 
                 # Ensure prediction and target have same shape (B, H, W)
                 if pred_depth_batch.shape != target_depth_batch.shape:
-                     print(f"Warning: Prediction shape {pred_depth_batch.shape} != Target shape {target_depth_batch.shape}. Resizing prediction.")
-                     pred_depth_batch = F.interpolate(pred_depth_batch.unsqueeze(1), # Add channel dim back for interpolate
-                                                      size=target_depth_batch.shape[-2:],
-                                                      mode='bilinear', # Use bilinear for predicted depth
-                                                      align_corners=False).squeeze(1) # Remove channel dim
+                    print(
+                        f"Warning: Prediction shape {pred_depth_batch.shape} != Target shape {target_depth_batch.shape}. Resizing prediction."
+                    )
+                    pred_depth_batch = F.interpolate(
+                        pred_depth_batch.unsqueeze(
+                            1
+                        ),  # Add channel dim back for interpolate
+                        size=target_depth_batch.shape[-2:],
+                        mode="bilinear",  # Use bilinear for predicted depth
+                        align_corners=False,
+                    ).squeeze(
+                        1
+                    )  # Remove channel dim
 
                 # --- Calculate and Accumulate Metrics ---
                 # Only compute metrics where the mask is valid
-                batch_metrics = compute_depth_metrics(pred_depth_batch, target_depth_batch, valid_mask_batch)
-                num_valid_pixels = batch_metrics['count']
+                batch_metrics = compute_depth_metrics(
+                    pred_depth_batch, target_depth_batch, valid_mask_batch
+                )
+                num_valid_pixels = batch_metrics["count"]
 
                 if num_valid_pixels > 0:
                     total_count += num_valid_pixels
                     for k in total_metrics:
-                       if not np.isnan(batch_metrics[k]): # Avoid adding NaNs
+                        if not np.isnan(batch_metrics[k]):  # Avoid adding NaNs
                             # Weighted average: metric_value * num_pixels_in_batch
                             total_metrics[k] += batch_metrics[k] * num_valid_pixels
 
@@ -168,7 +221,10 @@ def evaluate_model_on_datasets(model_path: str, dataset_configs: list, img_size:
         eval_time = end_time - start_time
 
         # --- Calculate Average Metrics ---
-        avg_metrics = {k: (total_metrics[k] / total_count if total_count > 0 else float('nan')) for k in total_metrics}
+        avg_metrics = {
+            k: (total_metrics[k] / total_count if total_count > 0 else float("nan"))
+            for k in total_metrics
+        }
 
         print(f"--- Results for {dataset_name} ({len(dataset)} samples) ---")
         print(f"Evaluation Time: {eval_time:.2f} seconds")
@@ -188,17 +244,26 @@ def evaluate_model_on_datasets(model_path: str, dataset_configs: list, img_size:
 
     return results
 
+
 # --- Main Execution ---
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Benchmark Depth Estimation Model')
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Benchmark Depth Estimation Model")
 
-    parser.add_argument('--img_size', type=int, default=32)
-    parser.add_argument('--batch_size', type=int, default=2)
+    parser.add_argument("--img_size", type=int, default=32)
+    parser.add_argument("--batch_size", type=int, default=2)
 
     # Example using placeholder paths:
-    parser.add_argument('--nyu_v2_path', type=str, default='/home/kothamachuharish.g/data/nyu_depth_v2_labeled.mat')
-    parser.add_argument('--custom_rgbd_path', type=str, default='/home/kothamachuharish.g/Distill-Any-Depth/')
+    parser.add_argument(
+        "--nyu_v2_path",
+        type=str,
+        default="/home/kothamachuharish.g/data/nyu_depth_v2_labeled.mat",
+    )
+    parser.add_argument(
+        "--custom_rgbd_path",
+        type=str,
+        default="/home/kothamachuharish.g/Distill-Any-Depth/",
+    )
 
     args = parser.parse_args()
 
@@ -208,17 +273,17 @@ if __name__ == '__main__':
             "name": "NYU Depth V2",
             "type": "nyu_v2_mat",
             "path": args.nyu_v2_path,
-             "img_key": 'images',
-             "depth_key": 'depths'
+            "img_key": "images",
+            "depth_key": "depths",
         }
     ]
 
     # --- Run Evaluation ---
     all_results = evaluate_model_on_datasets(
-        model_path=f'/home/kothamachuharish.g/data/depth_model_cifar_{args.img_size}.pth',
+        model_path=f"/home/kothamachuharish.g/data/depth_model_cifar_{args.img_size}.pth",
         dataset_configs=dataset_configurations,
         img_size=args.img_size,
-        batch_size=args.batch_size
+        batch_size=args.batch_size,
     )
 
     print("\n--- Benchmark Summary ---")
