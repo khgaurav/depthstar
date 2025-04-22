@@ -6,6 +6,10 @@ This repository contains code and resources for **DepthStar**, a lightweight and
 
 DepthStar is an autoencoder-based model leveraging a hybrid convolutional-transformer architecture. It efficiently estimates depth maps from single RGB images and is particularly suitable for deployment on edge devices.
 
+### Model Weights
+
+The model weights are available on **HuggingFace Hub 🤗** @ https://huggingface.co/spaces/keivalya/depthstar/blob/main/depth_model_all.pth
+
 ### Recommended Hardware
 - NVIDIA GPU (e.g., T4, RTX GPUs)
 
