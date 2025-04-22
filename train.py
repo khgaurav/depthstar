@@ -12,8 +12,8 @@ from model import DepthSTAR
 
 VAL_SPLIT = 0.1
 LOG_INTERVAL = 100
-SEED = 1349
 
+<<<<<<< HEAD
 torch.manual_seed(SEED)
 np.random.seed(SEED)
 if torch.cuda.is_available():
@@ -40,6 +40,9 @@ def train_model(
         model_save_path: directory to save model to
     """
     
+=======
+def train_model(epochs=100, batch_size=4, lr=1e-5, num_workers=2, data_dir='./Distill-Any-Depth', model_save_path='./data'):
+>>>>>>> 1993bc795e89abc36266382b041b6c81c7300042
     print("--- Starting Training Configuration ---")
     print(f"Epochs: {epochs}")
     print(f"Batch Size: {batch_size}")
@@ -68,8 +71,13 @@ def train_model(
         ]
     )
 
+<<<<<<< HEAD
     image_path = os.path.join(data_dir, "images_hf_stream_224")
     depth_path = os.path.join(data_dir, "depths_hf_stream_224")
+=======
+    image_path = os.path.join(data_dir, 'cifar_images')
+    depth_path = os.path.join(data_dir, 'cifar_depths')
+>>>>>>> 1993bc795e89abc36266382b041b6c81c7300042
 
     full_dataset = RGBDepthDataset(
         image_path, depth_path, transform_rgb, transform_depth
@@ -160,7 +168,11 @@ def train_model(
         # --- Save Best Model ---
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
+<<<<<<< HEAD
             save_filename = f"best_depth_model_2.pth"
+=======
+            save_filename = f'best_depth_model.pth'
+>>>>>>> 1993bc795e89abc36266382b041b6c81c7300042
             save_filepath = os.path.join(model_save_path, save_filename)
             os.makedirs(model_save_path, exist_ok=True)
             torch.save(model.state_dict(), save_filepath)
@@ -168,6 +180,7 @@ def train_model(
         else:
             print(f"  Validation loss did not improve from {best_val_loss:.4f}.")
 
+<<<<<<< HEAD
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train")
@@ -177,6 +190,16 @@ if __name__ == "__main__":
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--data_dir", type=str, default="../Distill-Any-Depth")
     parser.add_argument("--model_save_path", type=str, default="../data")
+=======
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Train')
+    parser.add_argument('--epochs', type=int, default=200)
+    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--lr', type=float, default=1e-4)
+    parser.add_argument('--num_workers', type=int, default=4)
+    parser.add_argument('--data_dir', type=str, default='./Distill-Any-Depth')
+    parser.add_argument('--model_save_path', type=str, default='./data')
+>>>>>>> 1993bc795e89abc36266382b041b6c81c7300042
 
     args = parser.parse_args()
 
