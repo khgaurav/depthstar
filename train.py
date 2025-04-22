@@ -11,14 +11,8 @@ import numpy as np
 
 VAL_SPLIT = 0.1
 LOG_INTERVAL = 100
-SEED = 1349
 
-torch.manual_seed(SEED)
-np.random.seed(SEED)
-if torch.cuda.is_available():
-    torch.cuda.manual_seed_all(SEED)
-
-def train_model(epochs=100, batch_size=4, lr=1e-5, num_workers=2, data_dir='../Distill-Any-Depth', model_save_path='../data'):
+def train_model(epochs=100, batch_size=4, lr=1e-5, num_workers=2, data_dir='./Distill-Any-Depth', model_save_path='./data'):
     print("--- Starting Training Configuration ---")
     print(f"Epochs: {epochs}")
     print(f"Batch Size: {batch_size}")
@@ -43,8 +37,8 @@ def train_model(epochs=100, batch_size=4, lr=1e-5, num_workers=2, data_dir='../D
         transforms.ToTensor()
     ])
 
-    image_path = os.path.join(data_dir, 'images_hf_stream_224')
-    depth_path = os.path.join(data_dir, 'depths_hf_stream_224')
+    image_path = os.path.join(data_dir, 'cifar_images')
+    depth_path = os.path.join(data_dir, 'cifar_depths')
 
     full_dataset = RGBDepthDataset(image_path, depth_path, transform_rgb, transform_depth)
     # full_dataset = NYUDepthV2MatDataset('../data/nyu_depth_v2_labeled.mat', transform=transform)
@@ -114,7 +108,7 @@ def train_model(epochs=100, batch_size=4, lr=1e-5, num_workers=2, data_dir='../D
         # --- Save Best Model ---
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
-            save_filename = f'best_depth_model_2.pth'
+            save_filename = f'best_depth_model.pth'
             save_filepath = os.path.join(model_save_path, save_filename)
             os.makedirs(model_save_path, exist_ok=True)
             torch.save(model.state_dict(), save_filepath)
@@ -125,11 +119,11 @@ def train_model(epochs=100, batch_size=4, lr=1e-5, num_workers=2, data_dir='../D
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train')
     parser.add_argument('--epochs', type=int, default=200)
-    parser.add_argument('--batch_size', type=int, default=4)
+    parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--num_workers', type=int, default=4)
-    parser.add_argument('--data_dir', type=str, default='../Distill-Any-Depth')
-    parser.add_argument('--model_save_path', type=str, default='../data')
+    parser.add_argument('--data_dir', type=str, default='./Distill-Any-Depth')
+    parser.add_argument('--model_save_path', type=str, default='./data')
 
     args = parser.parse_args()
 

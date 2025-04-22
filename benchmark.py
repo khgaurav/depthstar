@@ -59,7 +59,7 @@ def compute_depth_metrics(pred, gt, mask):
 
 # --- Main Evaluation Function ---
 
-def evaluate_model_on_datasets(model_path: str, dataset_configs: list, img_size: int, batch_size: int = 8):
+def evaluate_model_on_datasets(model_path: str, dataset_configs: list, batch_size: int = 8):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
@@ -193,12 +193,11 @@ def evaluate_model_on_datasets(model_path: str, dataset_configs: list, img_size:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Benchmark Depth Estimation Model')
 
-    parser.add_argument('--img_size', type=int, default=32)
     parser.add_argument('--batch_size', type=int, default=2)
 
     # Example using placeholder paths:
-    parser.add_argument('--nyu_v2_path', type=str, default='/home/kothamachuharish.g/data/nyu_depth_v2_labeled.mat')
-    parser.add_argument('--custom_rgbd_path', type=str, default='/home/kothamachuharish.g/Distill-Any-Depth/')
+    parser.add_argument('--nyu_v2_path', type=str, default='./data/nyu_depth_v2_labeled.mat')
+    parser.add_argument('--custom_rgbd_path', type=str, default='./Distill-Any-Depth/')
 
     args = parser.parse_args()
 
@@ -215,7 +214,7 @@ if __name__ == '__main__':
 
     # --- Run Evaluation ---
     all_results = evaluate_model_on_datasets(
-        model_path=f'/home/kothamachuharish.g/data/depth_model_cifar_{args.img_size}.pth',
+        model_path=f'./data/best_depth_model.pth',
         dataset_configs=dataset_configurations,
         img_size=args.img_size,
         batch_size=args.batch_size
